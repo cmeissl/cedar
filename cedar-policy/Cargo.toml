@@ -39,8 +39,9 @@ integration_testing = []
 
 # Experimental features.
 # Enable all experimental features with `cargo build --features "experimental"`
-experimental = ["partial-eval"]
+experimental = ["partial-eval", "ipaddr-any"]
 partial-eval = ["cedar-policy-core/partial-eval"]
+ipaddr-any = ["cedar-policy-core/ipaddr-any", "cedar-policy-validator/ipaddr-any"]
 
 [lib]
 crate_type = ["rlib"]

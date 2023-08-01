@@ -29,6 +29,13 @@ fn get_argument_types(fname: &str, ipaddr_ty: &Type) -> Vec<types::Type> {
         "ip" => vec![Type::primitive_string()],
         "isIpv4" | "isIpv6" | "isLoopback" | "isMulticast" => vec![ipaddr_ty.clone()],
         "isInRange" => vec![ipaddr_ty.clone(), ipaddr_ty.clone()],
+        #[cfg(feature = "ipaddr-any")]
+        "isInAnyRange" => vec![
+            ipaddr_ty.clone(),
+            Type::Set {
+                element_type: Some(Box::new(ipaddr_ty.clone())),
+            },
+        ],
         _ => panic!("unexpected ipaddr extension function name: {fname}"),
     }
 }
@@ -39,6 +46,8 @@ fn get_return_type(fname: &str, ipaddr_ty: &Type) -> Type {
         "isIpv4" | "isIpv6" | "isLoopback" | "isMulticast" | "isInRange" => {
             Type::primitive_boolean()
         }
+        #[cfg(feature = "ipaddr-any")]
+        "isInAnyRange" => Type::primitive_boolean(),
         _ => panic!("unexpected ipaddr extension function name: {fname}"),
     }
 }
@@ -47,6 +56,8 @@ fn get_argument_check(fname: &str) -> Option<ArgumentCheckFn> {
     match fname {
         "ip" => Some(Box::new(validate_ip_string)),
         "isIpv4" | "isIpv6" | "isLoopback" | "isMulticast" | "isInRange" => None,
+        #[cfg(feature = "ipaddr-any")]
+        "isInAnyRange" => None,
         _ => panic!("unexpected ipaddr extension function name: {fname}"),
     }
 }

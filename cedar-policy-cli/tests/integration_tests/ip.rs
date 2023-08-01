@@ -40,3 +40,9 @@ fn ip_2() {
 fn ip_3() {
     perform_integration_test_from_json(folder().join("3.json"));
 }
+
+#[test]
+#[cfg(feature = "ipaddr-any")]
+fn ip_4() {
+    perform_integration_test_from_json(folder().join("4.json"));
+}

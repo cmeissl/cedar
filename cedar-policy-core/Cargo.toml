@@ -43,6 +43,7 @@ arbitrary = ["dep:arbitrary"]
 
 # Experimental features.
 partial-eval = []
+ipaddr-any = []
 
 [build-dependencies]
 lalrpop = "0.20.0"

@@ -37,6 +37,8 @@ mod names {
         pub static ref IS_LOOPBACK : Name = Name::parse_unqualified_name("isLoopback").expect("should be a valid identifier");
         pub static ref IS_MULTICAST : Name = Name::parse_unqualified_name("isMulticast").expect("should be a valid identifier");
         pub static ref IS_IN_RANGE : Name = Name::parse_unqualified_name("isInRange").expect("should be a valid identifier");
+        #[cfg(feature = "ipaddr-any")]
+        pub static ref IS_IN_ANY_RANGE : Name = Name::parse_unqualified_name("isInAnyRange").expect("should be a valid identifier");
     }
 }
 
@@ -326,10 +328,73 @@ fn is_in_range(child: Value, parent: Value) -> evaluator::Result<ExtensionOutput
     Ok(child_ip.is_in_range(parent_ip).into())
 }
 
+/// Cedar function which tests whether the first `ipaddr` Cedar type is
+/// in the set of IP range represented by the second `set` Cedar type, returning
+/// a Cedar bool
+#[cfg(feature = "ipaddr-any")]
+fn is_in_any_range(child: Value, parent: Value) -> evaluator::Result<ExtensionOutputValue> {
+    let child_ev = match child {
+        Value::ExtensionValue(ev) if ev.typename() == IPAddr::typename() => ev,
+        _ => {
+            return Err(evaluator::EvaluationError::TypeError {
+                expected: vec![Type::Extension {
+                    name: IPAddr::typename(),
+                }],
+                actual: child.type_of(),
+            })
+        }
+    };
+    let parent_set = match parent {
+        Value::Set(set) => set,
+        _ => {
+            return Err(evaluator::EvaluationError::TypeError {
+                expected: vec![Type::Set],
+                actual: parent.type_of(),
+            })
+        }
+    };
+
+    // PANIC SAFETY Typechecking performed above
+    #[allow(clippy::expect_used)]
+    let child_ip = child_ev
+        .value()
+        .as_any()
+        .downcast_ref::<IPAddr>()
+        .expect("already typechecked above, so this downcast should succeed");
+    for item in parent_set.iter() {
+        let item_ev = match item {
+            Value::ExtensionValue(ev) if ev.typename() == IPAddr::typename() => ev,
+            _ => {
+                return Err(evaluator::EvaluationError::TypeError {
+                    expected: vec![Type::Extension {
+                        name: IPAddr::typename(),
+                    }],
+                    actual: item.type_of(),
+                })
+            }
+        };
+        // PANIC SAFETY Typechecking performed above
+        #[allow(clippy::expect_used)]
+        let item_ip = item_ev
+            .value()
+            .as_any()
+            .downcast_ref::<IPAddr>()
+            .expect("already typechecked above, so this downcast should succeed");
+        if child_ip.is_in_range(item_ip) {
+            return Ok(true.into());
+        }
+    }
+    Ok(false.into())
+}
+
 /// Construct the extension
 pub fn extension() -> Extension {
     let ipaddr_type = SchemaType::Extension {
         name: IPAddr::typename(),
+    };
+    #[cfg(feature = "ipaddr-any")]
+    let ipaddr_set_type = SchemaType::Set {
+        element_ty: Box::new(ipaddr_type.clone()),
     };
     Extension::new(
         names::EXTENSION_NAME.clone(),
@@ -374,7 +439,15 @@ pub fn extension() -> Extension {
                 CallStyle::MethodStyle,
                 Box::new(is_in_range),
                 SchemaType::Bool,
-                (Some(ipaddr_type.clone()), Some(ipaddr_type)),
+                (Some(ipaddr_type.clone()), Some(ipaddr_type.clone())),
+            ),
+            #[cfg(feature = "ipaddr-any")]
+            ExtensionFunction::binary(
+                names::IS_IN_ANY_RANGE.clone(),
+                CallStyle::MethodStyle,
+                Box::new(is_in_any_range),
+                SchemaType::Bool,
+                (Some(ipaddr_type.clone()), Some(ipaddr_set_type)),
             ),
         ],
     )
@@ -442,6 +515,13 @@ mod tests {
         assert!(!ext
             .get_func(
                 &Name::parse_unqualified_name("isInRange").expect("should be a valid identifier")
+            )
+            .expect("function should exist")
+            .is_constructor(),);
+        #[cfg(feature = "ipaddr-any")]
+        assert!(!ext
+            .get_func(
+                &Name::parse_unqualified_name("isInAnyRange").expect("should be a valid identifier")
             )
             .expect("function should exist")
             .is_constructor(),);
